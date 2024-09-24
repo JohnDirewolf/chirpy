@@ -23,10 +23,26 @@ func endHandler(response http.ResponseWriter, request *http.Request) {
 	response.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
+/* //Used for api hit reporting, currently disabled for the admin reporting
 func (cfg *apiConfig) handler(response http.ResponseWriter, request *http.Request) {
 	response.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	response.WriteHeader(http.StatusOK)
 	response.Write([]byte(fmt.Sprintf("Hits: %v", cfg.fileserverHits.Load())))
+}
+*/
+
+func (cfg *apiConfig) adminHandler(response http.ResponseWriter, request *http.Request) {
+	response.Header().Add("Content-Type", "text/html; charset=utf-8")
+	response.WriteHeader(http.StatusOK)
+	webpage := fmt.Sprintf(`
+	<html>
+	<body>
+		<h1>Welcome, Chirpy Admin</h1>
+		<p>Chirpy has been visited %d times!</p>
+	</body>
+	</html>`,
+		cfg.fileserverHits.Load())
+	response.Write([]byte(webpage))
 }
 
 func (cfg *apiConfig) reset(response http.ResponseWriter, request *http.Request) {
@@ -46,11 +62,14 @@ func main() {
 	mux := http.NewServeMux()
 	srv.Handler = mux
 	srv.Addr = ":8080"
-	//mux.Handle("/app/", http.StripPrefix("/app", hits.middlewareMetricsInc(http.FileServer(http.Dir(".")))))
+	//File Server
 	mux.Handle("/app/", http.StripPrefix("/app", hits.middlewareMetricsInc(http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("/metrics", hits.handler)
-	mux.HandleFunc("/healthz", endHandler)
-	mux.HandleFunc("/reset", hits.reset)
+	//Check on status
+	mux.HandleFunc("GET /api/healthz", endHandler)
+	//Hit Metric functions
+	//mux.HandleFunc("GET /api/metrics", hits.handler)
+	mux.HandleFunc("GET /admin/metrics", hits.adminHandler)
+	mux.HandleFunc("POST /admin/reset", hits.reset)
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		// Error starting or closing listener:
