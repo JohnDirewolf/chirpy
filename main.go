@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	//"log"
 	"net/http"
@@ -58,54 +59,61 @@ func (cfg *apiConfig) reset(response http.ResponseWriter, request *http.Request)
 	response.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
+func profanityFilter(rawString string) string {
+	rawArray := strings.Split(rawString, " ")
+	for i := 0; i < len(rawArray); i++ {
+		//This could be done as a profantity array with the words to check, allowing easier adding of profanity, but as there are only three it is just a long boolean.
+		if strings.ToLower(rawArray[i]) == "kerfuffle" || strings.ToLower(rawArray[i]) == "sharbert" || strings.ToLower(rawArray[i]) == "fornax" {
+			rawArray[i] = "****"
+		}
+	}
+	return strings.Join(rawArray, " ")
+}
+
 func validateChirp(response http.ResponseWriter, request *http.Request) {
+	//So this has been massively rewritten as there are major changes in the structure of the responses. I commited the old version to have it available if needed.
+
 	//This is the structure for the request which has the Chirp we want to validate.
-	type parameters struct {
+	type requestParameters struct {
 		Body string `json:"body"`
 	}
-	//This is the structure if there is an error.
-	type returnError struct {
-		Err string `json:"error"`
+	//This is the now common structure of a response.
+	type responseParameters struct {
+		CleanedBody string `json:"cleaned_body"`
 	}
-	//This is the structure if the the Chirp is a valid length
-	type returnValid struct {
-		Valid bool `json:"valid"`
-	}
-	//We are going to respond with json reguardless of what happens.
-	response.Header().Set("Content-Type", "application/json")
-	//We could do some error checks on the json marshalling but it is all hard coded so it should work or it does not when we build it.
-	//Also it is possible we could use some scoped variables and make this less repetative, but its a learning exprierence and fine tuning is not the point.
+
+	var dataToReturn responseParameters
+
 	decoder := json.NewDecoder(request.Body)
-	params := parameters{}
+	params := requestParameters{}
 	err := decoder.Decode(&params)
 	if err != nil {
 		//There was an error in the decoding, so we do a error response, we do not use params here.
 		response.WriteHeader(500)
-		dataToReturn := returnError{
-			Err: "Something went wrong",
+		dataToReturn = responseParameters{
+			CleanedBody: "Error reported! Something went wrong",
 		}
-		dataMarshalled, _ := json.Marshal(dataToReturn)
-		response.Write(dataMarshalled)
 	} else {
 		//Check if the length of the chirp is vailid first
 		//fmt.Printf("Params Body: %v", params.Body)
 		if len(params.Body) > 140 {
 			response.WriteHeader(400)
-			dataToReturn := returnError{
-				Err: "Chirp is too long",
+			dataToReturn = responseParameters{
+				CleanedBody: params.Body,
 			}
-			dataMarshalled, _ := json.Marshal(dataToReturn)
-			response.Write(dataMarshalled)
 		} else {
 			//Tweet is valid
 			response.WriteHeader(200)
-			dataToReturn := returnValid{
-				Valid: true,
+			dataToReturn = responseParameters{
+				CleanedBody: profanityFilter(params.Body),
 			}
-			dataMarshalled, _ := json.Marshal(dataToReturn)
-			response.Write(dataMarshalled)
 		}
 	}
+	//So we have set our header status code and have the response data now to marshal and write it.
+	response.Header().Set("Content-Type", "application/json")
+	//We could do some error checks on the json marshalling but it is all hard coded so it should work or it does not when we build it.
+	dataMarshalled, _ := json.Marshal(dataToReturn)
+	response.Write(dataMarshalled)
 }
 
 func main() {
