@@ -1,4 +1,4 @@
 -- name: CreateUser :one
-INSERT INTO users (id, created_at, updated_at, email)
-VALUES (gen_random_uuid (), NOW(), NOW(), $1)
-RETURNING *;
+INSERT INTO users (id, created_at, updated_at, hashed_password, email)
+VALUES (gen_random_uuid (), NOW(), NOW(), $1, $2)
+RETURNING id, created_at, updated_at, email, is_chirpy_red;
